@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Denis Kakashka 3D - Mobile & PC</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none}
+body{overflow:hidden;font-family:'Segoe UI',Arial,sans-serif;background:#000;color:#fff;touch-action:none}
+canvas{display:block}
+
+/* КРАСИВЫЙ АДАПТИВНЫЙ ХУД */
+#hud{position:absolute;top:0;left:0;right:0;padding:16px 24px;display:flex;justify-content:space-between;pointer-events:none;z-index:10;font-size:16px}
+.hud-box{background:rgba(10,10,20,.7);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:10px 16px;display:flex;align-items:center;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.coin-icon{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#fff59d,#ffd60a 40%,#e8a800);box-shadow:0 0 10px #ffd60a99}
+.hud-label{font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.hud-val{font-size:18px;font-weight:800}
+
+/* КНОПКИ УПРАВЛЕНИЯ НА МОБИЛКЕ */
+#mobile-controls{position:absolute;inset:0;z-index:15;display:none;pointer-events:none}
+#joystick-zone{position:absolute;bottom:30px;left:30px;width:120px;height:120px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.3);border-radius:50%;pointer-events:auto;display:flex;align-items:center;justify-content:center}
+#joystick-knob{width:50px;height:50px;background:rgba(255,255,255,.5);border-radius:50%;box-shadow:0 0 10px rgba(0,0,0,.3)}
+#jump-btn{position:absolute;bottom:40px;right:40px;width:90px;height:90px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.4);border-radius:50%;pointer-events:auto;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:bold;color:#fff;backdrop-filter:blur(4px)}
+#jump-btn:active{background:rgba(255,255,255,.3)}
+
+/* СКРЫТИЕ ХИНТА НА МОБИЛКЕ */
+@media (max-width: 768px) {
+  #hint { display: none !important; }
+  #mobile-controls { display: block; }
+  .menu-btn { min-width: 240px; font-size: 16px; padding: 14px 24px; }
+  .menu-title { font-size: 32px; }
+}
+
+/* ОСТАЛЬНОЕ МЕНЮ */
+.screen{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:20;background:radial-gradient(circle at 50% 30%,rgba(30,40,80,.95),rgba(5,5,15,.98));padding:20px;overflow-y:auto}
+.screen.active{display:flex}
+.menu-title{font-size:clamp(32px,7vw,80px);font-weight:900;letter-spacing:-2px;background:linear-gradient(135deg,#ffd60a,#ff9500,#ff5d8f);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px;text-align:center}
+.menu-sub{font-size:14px;opacity:.6;margin-bottom:30px;letter-spacing:3px;text-transform:uppercase;text-align:center}
+.menu-btn{min-width:280px;padding:16px 32px;margin:6px;font-size:18px;font-weight:700;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.06);color:#fff;cursor:pointer;transition:all .2s;font-family:inherit;backdrop-filter:blur(4px)}
+.menu-btn:hover{background:rgba(255,255,255,.15);transform:translateY(-2px);border-color:#ffd60a}
+.menu-btn.primary{background:linear-gradient(135deg,#ffd60a,#ff9500);color:#111;border:none;font-size:22px;padding:20px 40px;box-shadow:0 0 20px rgba(255,214,10,0.4)}
+.levels-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;max-width:900px;width:100%;margin:20px 0}
+.level-card{background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);border-radius:16px;padding:16px;cursor:pointer;transition:all .2s;text-align:center}
+.level-card:hover{transform:translateY(-4px);border-color:#ffd60a}
+.level-card.locked{opacity:.5;cursor:not-allowed}
+.level-num{font-size:12px;opacity:.6;letter-spacing:2px;margin-bottom:6px}
+.level-name{font-size:16px;font-weight:800;margin-bottom:6px}
+.level-diff{font-size:11px;font-weight:700;padding:4px 10px;border-radius:10px;display:inline-block}
+.diff-easy{background:#2ec4b655;color:#2ec4b6}
+.diff-medium{background:#ffd60a55;color:#ffd60a}
+.diff-hard{background:#ff950055;color:#ff9500}
+.diff-expert{background:#ff5d8f55;color:#ff5d8f}
+
+/* ПАНЕЛЬ ПАССОВ */
+.pass-panel{background:rgba(0,0,0,.6);border:1px solid #ffd60a;border-radius:16px;padding:12px 20px;margin-bottom:16px;text-align:center;max-width:800px;width:100%}
+.pass-panel h3{color:#ffd60a;margin-bottom:8px;font-size:14px}
+.pass-selector{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.pass-item{padding:6px 12px;background:rgba(255,255,255,.1);border-radius:10px;cursor:pointer;font-size:12px;transition:0.2s;border:1px solid transparent}
+.pass-item.active{background:#ffd60a;color:#111;font-weight:bold;border-color:#fff}
+
+/* МАГАЗИН */
+#shop .shop-content{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:1100px;padding:10px;max-height:50vh;overflow-y:auto}
+.skin-card{width:140px;background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.15);border-radius:16px;padding:12px;text-align:center;transition:all .2s;cursor:pointer;position:relative}
+.skin-card:hover{transform:translateY(-4px);border-color:#ffd60a}
+.skin-card.owned{border-color:#2ec4b6}
+.skin-card.equipped{border-color:#ffd60a;box-shadow:0 0 0 3px #ffd60a55}
+.skin-preview{width:70px;height:70px;margin:0 auto 8px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center;font-size:40px;background:rgba(255,255,255,0.1)}
+.skin-name{font-size:12px;font-weight:700;margin-bottom:6px}
+.skin-price{font-size:11px;color:#ffd60a;font-weight:700}
+.shop-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;justify-content:center}
+.shop-tab{padding:8px 16px;background:rgba(255,255,255,.1);border-radius:10px;cursor:pointer;font-size:14px;font-weight:700;transition:0.2s}
+.shop-tab.active{background:linear-gradient(135deg,#ffd60a,#ff9500);color:#111}
+
+#victory h1{font-size:40px;background:linear-gradient(135deg,#ffd60a,#ff9500);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:16px;text-align:center}
+#victory p{font-size:16px;margin-bottom:6px;opacity:.9}
+#toast{position:absolute;bottom:60px;left:50%;transform:translateX(-50%) translateY(100px);background:rgba(0,0,0,.85);border:1px solid rgba(255,255,255,.2);padding:12px 20px;border-radius:14px;font-size:14px;font-weight:600;z-index:30;opacity:0;transition:all .3s;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#loader{position:fixed;inset:0;background:#0a0a15;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:100;transition:opacity .5s}
+#loader.hide{opacity:0;pointer-events:none}
+.spinner{width:50px;height:50px;border:4px solid rgba(255,255,255,.1);border-top-color:#ffd60a;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loader p{opacity:.6;font-size:12px;letter-spacing:2px}
+
+/* Лидерборд */
+.leaderboard-table{width:100%;max-width:600px;border-collapse:collapse;margin-top:16px;background:rgba(255,255,255,.05);border-radius:12px;overflow:hidden;font-size:14px}
+.leaderboard-table th{background:rgba(0,0,0,.4);padding:10px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:1px;opacity:.8}
+.leaderboard-table td{padding:10px;border-bottom:1px solid rgba(255,255,255,.1)}
+.leaderboard-table tr:last-child td{border-bottom:none}
+.rank-1{color:#ffd700;font-weight:900}
+.rank-2{color:#c0c0c0;font-weight:900}
+.rank-3{color:#cd7f32;font-weight:900}
+
+/* АДМИНКА */
+.admin-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a1a1a;border:2px solid #ff0044;border-radius:16px;padding:20px;z-index:999;display:none;flex-direction:column;gap:10px;box-shadow:0 0 50px rgba(255,0,68,0.5);min-width:300px;max-height:90vh;overflow-y:auto}
+.admin-panel h2{color:#ff0044;margin-bottom:10px;text-align:center;font-size:20px}
+.admin-panel .menu-btn{min-width:100%;padding:10px;margin:0;border-color:#ff0044;background:rgba(255,0,68,0.1);font-size:14px}
+.admin-close{position:absolute;top:8px;right:12px;cursor:pointer;font-size:20px;color:#888;background:none;border:none}
+</style>
+</head>
+<body>
+<div id="loader"><div class="spinner"></div><p>ЗАГРУЗКА 3D...</p></div>
+
+<!-- АДМИНКА -->
+<div class="admin-panel" id="adminPanel">
+  <button class="admin-close" onclick="closeAdmin()">×</button>
+  <h2>⚡ АДМИН ПАНЕЛЬ</h2>
+  <button class="menu-btn" onclick="adminAddCoins()">💰 +1000 Монет</button>
+  <button class="menu-btn" style="background:#ffaa00;color:#111" onclick="adminAddMillion()">💎 +1 000 000 Монет</button>
+  <button class="menu-btn" style="background:#00ff00;color:#111" onclick="adminAddTenMillion()">🤑 +10 000 000 Монет</button>
+  <button class="menu-btn" onclick="adminUnlockLevels()">🔓 Открыть все уровни</button>
+  <button class="menu-btn" onclick="adminUnlockSkins()">🛍 Выдать все скины</button>
+  <button class="menu-btn" onclick="adminUnlockHats()">👑 Выдать все аксессуары</button>
+  <button class="menu-btn" onclick="adminUnlockPasses()">🎫 Выдать все геймпассы</button>
+  <button class="menu-btn" onclick="adminKill()">💀 Убить себя (Рестарт)</button>
+  <button class="menu-btn" style="border-color:#ff0000;color:#ff0000" onclick="adminReset()">🗑 Сбросить прогресс</button>
+</div>
+
+<!-- ХУД -->
+<div id="hud" style="display:none">
+  <div class="hud-box"><div class="coin-icon"></div><div><div class="hud-label">Монеты</div><div class="hud-val"><span id="cc">0</span>/<span id="tc">0</span></div></div></div>
+  <div class="hud-box"><div><div class="hud-label">Время</div><div class="hud-val" id="time">0.0</div></div></div>
+</div>
+<div id="hint" style="display:none">Клик — мышь · WASD — ходьба · <b>Space — прыжок</b> · ESC — пауза · R — рестарт</div>
+
+<!-- МОБИЛЬНЫЕ КНОПКИ -->
+<div id="mobile-controls">
+  <div id="joystick-zone"><div id="joystick-knob"></div></div>
+  <div id="jump-btn">JUMP</div>
+</div>
+
+<div class="screen active" id="mainMenu">
+  <div class="menu-title">DENIS KAKASHKA 3D</div>
+  <div class="menu-sub">Mobile Edition 1.1</div>
+  <button class="menu-btn primary" onclick="showScreen('levels')">▶ Играть</button>
+  <button class="menu-btn" onclick="showScreen('leaderboard')">🏆 Таблица лидеров</button>
+  <button class="menu-btn" onclick="showScreen('shop')">🛒 Магазин</button>
+  <div style="margin-top:16px;font-size:14px;opacity:.5">Монеты: <span id="menuCoins" style="color:#ffd60a;font-weight:700">0</span></div>
+</div>
+
+<div class="screen" id="levels">
+  <div class="menu-title" style="font-size:32px">ВЫБОР УРОВНЯ</div>
+  <div class="pass-panel">
+    <h3>🎮 Выбери геймпасс (только 1)</h3>
+    <div class="pass-selector" id="passSelector"></div>
+  </div>
+  <div class="levels-grid" id="levelsGrid"></div>
+  <button class="menu-btn" style="margin-top:12px" onclick="showScreen('mainMenu')">← Назад</button>
+</div>
+
+<div class="screen" id="leaderboard">
+  <div class="menu-title" style="font-size:32px">ТАБЛИЦА ЛИДЕРОВ</div>
+  <table class="leaderboard-table">
+    <thead><tr><th>#</th><th>Игрок</th><th>Монеты</th><th>Ур.</th></tr></thead>
+    <tbody id="leaderboardBody"></tbody>
+  </table>
+  <button class="menu-btn" style="margin-top:16px" onclick="showScreen('mainMenu')">← Назад</button>
+</div>
+
+<div class="screen" id="shop">
+  <div class="menu-title" style="font-size:32px">МАГАЗИН</div>
+  <div style="font-size:14px;opacity:.7;margin-bottom:8px">Монеты: <span id="shopCoins" style="color:#ffd60a;font-weight:700">0</span></div>
+  <div class="shop-tabs">
+    <div class="shop-tab active" onclick="switchShopTab('skins')">Скины</div>
+    <div class="shop-tab" onclick="switchShopTab('accessories')">Аксессуары</div>
+    <div class="shop-tab" onclick="switchShopTab('gamepasses')">Геймпассы</div>
+  </div>
+  <div class="shop-content" id="shopContent"></div>
+  <button class="menu-btn" style="margin-top:16px" onclick="showScreen('mainMenu')">← Назад</button>
+</div>
+
+<div class="screen" id="pause">
+  <div class="menu-title" style="font-size:40px">ПАУЗА</div>
+  <button class="menu-btn primary" onclick="resumeGame()">▶ Продолжить</button>
+  <button class="menu-btn" onclick="restartGame()">↻ Рестарт</button>
+  <button class="menu-btn" onclick="exitToMenu()">🏠 В меню</button>
+</div>
+
+<div class="screen" id="victory">
+  <h1>🏆 УРОВЕНЬ ПРОЙДЕН!</h1>
+  <p id="wt"></p>
+  <p id="tt"></p>
+  <p id="reward" style="color:#ffd60a;font-weight:700;font-size:16px"></p>
+  <button class="menu-btn primary" style="margin-top:16px" onclick="nextLevel()">→ Следующий</button>
+  <button class="menu-btn" onclick="restartGame()">↻ Рестарт</button>
+  <button class="menu-btn" onclick="showScreen('levels')">🏠 Выбор уровня</button>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+
+<script>
+window.addEventListener('load', () => {
+  if(typeof THREE === 'undefined') {
+    document.getElementById('loader').innerHTML = '<p style="color:#ff5d8f;text-align:center;">Ошибка: Нет интернета для загрузки 3D!</p>';
+    return;
+  }
+  try { initGame(); } catch(e) { document.getElementById('loader').innerHTML = `<p style="color:#ff5d8f;text-align:center;">Ошибка: ${e.message}</p>`; }
+});
+
+let scene, camera, renderer;
+let plats=[], coins=[], lasers=[], spinners=[], spikes=[], saws=[];
+let levelGroup, flagMesh, finishObj;
+let currentLevelIdx = 0, totalCoins = 0, currentSkin = 'default', currentHat = 'none', unlockedLevels = 1;
+let wins = 0, gameState = 'menu';
+let camYaw = 0, camPitch = -0.15, camDist = 12;
+const camTarget = new THREE.Vector3(0,3,0);
+const P = {pos:new THREE.Vector3(0,2,0), vel:new THREE.Vector3(), onGround:false, jumps:2, r:0.55, h:2.7};
+let charParts = {}, pg;
+let walkPhase = 0, idleTime = 0, jumpPrev = false;
+let jumpPressedAt = -999, lastGroundedAt = -999;
+let groundType = null, coinsGot = 0, startTime = 0;
+let shopTab = 'skins', activePass = null;
+
+// МОБИЛЬНОЕ УПРАВЛЕНИЕ
+let isMobile = false;
+let joyX = 0, joyY = 0;
+let joystickActive = false;
+let jumpBtnPressed = false;
+
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+const SKINS = [
+  {id:'default', name:'Стандарт', emoji:'🟦', color:0x2ec4b6, price:0, owned:true},
+  {id:'girl1', name:'Алиса', emoji:'👧', color:0xff6b9d, price:50, owned:false},
+  {id:'boy1', name:'Макс', emoji:'👦', color:0x4a90e2, price:50, owned:false},
+  {id:'ninja', name:'Ниндзя', emoji:'🥷', color:0x2d2d2d, price:150, owned:false},
+  {id:'robot', name:'Робот', emoji:'🤖', color:0x999999, price:200, owned:false},
+  {id:'wizard', name:'Волшебник', emoji:'🧙', color:0x6a0dad, price:250, owned:false},
+  {id:'pirate', name:'Пират', emoji:'🏴‍☠️', color:0x8b4513, price:250, owned:false},
+  {id:'alien', name:'Пришелец', emoji:'👽', color:0x00ff88, price:300, owned:false},
+  {id:'king', name:'Король', emoji:'👑', color:0xffd700, price:400, owned:false},
+  {id:'devil', name:'Дьявол', emoji:'😈', color:0xff0000, price:500, owned:false},
+  {id:'angel', name:'Ангел', emoji:'😇', color:0xffffff, price:500, owned:false},
+  {id:'hacker', name:'Хакер', emoji:'👨‍💻', color:0x00ff00, price:600, owned:false},
+  {id:'meme', name:'Мем', emoji:'😂', color:0xffcc00, price:777, owned:false},
+  {id:'god', name:'Бог', emoji:'⚡', color:0x00ffff, price:1000, owned:false},
+  {id:'vip', name:'VIP', emoji:'💎', color:0xff00ff, price:1500, owned:false}
+];
+
+const ACCESSORIES = [
+  {id:'none', name:'Без шляпы', emoji:'🚫', price:0, owned:true},
+  {id:'cap', name:'Кепка', emoji:'🧢', price:100, owned:false},
+  {id:'crown', name:'Корона', emoji:'👑', price:300, owned:false},
+  {id:'tophat', name:'Цилиндр', emoji:'🎩', price:250, owned:false},
+  {id:'halo', name:'Нимб', emoji:'😇', price:500, owned:false},
+  {id:'horns', name:'Рога', emoji:'😈', price:500, owned:false}
+];
+
+const PASSSES = [
+  {id:'skip', name:'Пропуск уровня', desc:'Мгновенно пройти уровень', price:2000, owned:false},
+  {id:'noLasers', name:'Убрать лазеры', desc:'Лазеры исчезают', price:5000, owned:false},
+  {id:'godMode', name:'Бессмертие', desc:'Шипы не наносят урон', price:8000, owned:false},
+  {id:'wings', name:'Крылья', desc:'Зажми Space/Джойстик вверх, чтобы летать', price:15000, owned:false},
+  {id:'walkVoid', name:'Ходить по пустоте', desc:'Невидимый пол под ногами', price:20000, owned:false},
+  {id:'straightRoad', name:'Прямая дорога', desc:'Мост прямо к финишу', price:50000, owned:false}
+];
+
+const LEVELS = [
+  {name:'Новичок', diff:'easy', diffName:'ЛЁГКИЙ', plats:[[0,0,0,14,14,'ground'],[8,1,-8,7,7,'ground'],[15,2,-15,7,7,'ground'],[8,3,-22,7,7,'ground'],[15,4,-29,7,7,'ground'],[24,5,-33,8,7,'move'],[34,6,-35,7,7,'ice'],[42,4,-28,7,7,'bounce'],[35,8,-19,8,8,'ground'],[26,10,-17,7,7,'ground'],[40,12,-10,14,14,'ground']], coins:[[8,3,-8],[15,4,-15],[8,5,-22],[15,6,-29],[24,7,-33],[34,8,-35],[42,6,-28],[35,11,-19],[26,13,-17]], lasers:[], spinners:[], spikes:[], saws:[], finish:{x:40,y:12,z:-10,r:4}},
+  {name:'Разминка', diff:'easy', diffName:'ЛЁГКИЙ', plats:[[0,0,0,14,14,'ground'],[8,1,-8,6,6,'ground'],[15,2,-15,6,6,'ground'],[8,3,-22,6,6,'ground'],[15,4,-29,6,6,'ground'],[24,5,-33,7,6,'move'],[34,6,-35,6,6,'ice'],[42,4,-28,6,6,'bounce'],[35,8,-19,7,7,'ground'],[26,10,-17,5,5,'ground'],[32,12,-10,5,5,'small'],[40,12,-10,12,12,'ground']], coins:[[8,3,-8],[15,4,-15],[8,5,-22],[15,6,-29],[24,7,-33],[34,8,-35],[42,6,-28],[35,11,-19],[32,15,-10]], lasers:[[12,2.5,-11,0,6]], spinners:[[28,6,-33,2.2,.03]], spikes:[[18,4,-19,4,'z']], saws:[], finish:{x:40,y:12,z:-10,r:4}},
+  {name:'Испытание', diff:'medium', diffName:'СРЕДНИЙ', plats:[[0,0,0,12,12,'ground'],[8,1,-8,6,6,'ground'],[15,2,-15,5,5,'ground'],[8,3,-22,6,6,'ground'],[15,4,-29,5,5,'ground'],[24,5,-33,6,5,'move'],[34,6,-35,5,5,'ice'],[42,4,-28,5,5,'bounce'],[35,8,-19,6,6,'ground'],[26,10,-17,5,5,'ground'],[32,12,-10,4,4,'small'],[24,14,-8,4,4,'small'],[32,16,-4,5,5,'ground'],[40,12,-10,12,12,'ground']], coins:[[8,3,-8],[15,4,-15],[8,5,-22],[15,6,-29],[24,7,-33],[34,8,-35],[42,6,-28],[35,11,-19],[32,15,-10]], lasers:[[12,2.5,-11,0,6],[20,3.5,-19,Math.PI/2,6],[38,7,-32,Math.PI/4,6]], spinners:[[28,6,-33,2.2,.03],[32,13,-6,2.2,.035]], spikes:[[18,4,-19,4,'z'],[26,11,-14,3,'z']], saws:[[24,6.5,-38]], finish:{x:40,y:12,z:-10,r:4}},
+  {name:'Хардкор', diff:'hard', diffName:'СЛОЖНЫЙ', plats:[[0,0,0,12,12,'ground'],[8,1,-8,5,5,'ground'],[15,2,-15,5,5,'ground'],[8,3,-22,5,5,'ground'],[15,4,-29,5,5,'ground'],[24,5,-33,6,5,'move'],[34,6,-35,5,5,'ice'],[42,4,-28,5,5,'bounce'],[35,8,-19,6,6,'ground'],[26,10,-17,4,4,'ground'],[32,12,-10,4,4,'small'],[24,14,-8,3,3,'small'],[32,16,-4,5,5,'ground'],[22,18,-4,3,3,'small'],[28,20,0,5,5,'ground'],[40,12,-10,12,12,'ground']], coins:[[8,3,-8],[15,4,-15],[8,5,-22],[15,6,-29],[24,7,-33],[34,8,-35],[42,6,-28],[35,11,-19],[32,15,-10]], lasers:[[12,2.5,-11,0,6],[20,3.5,-19,Math.PI/2,6],[38,7,-32,Math.PI/4,6],[26,11,-14,0,6],[36,13,-6,Math.PI/2,6]], spinners:[[28,6,-33,2.2,.03],[32,13,-6,2.2,.035],[8,9,-22,2,.04]], spikes:[[18,4,-19,4,'z'],[26,11,-14,3,'z'],[32,17,-2,3,'z']], saws:[[24,6.5,-38],[38,9,-16]], finish:{x:40,y:12,z:-10,r:4}},
+  {name:'Безумие', diff:'expert', diffName:'ОЧЕНЬ СЛОЖНЫЙ', plats:[[0,0,0,12,12,'ground'],[8,1,-8,4,4,'ground'],[15,2,-15,4,4,'ground'],[8,3,-22,4,4,'ground'],[15,4,-29,4,4,'ground'],[24,5,-33,5,4,'move'],[34,6,-35,4,4,'ice'],[42,4,-28,4,4,'bounce'],[35,8,-19,5,5,'ground'],[26,10,-17,3,3,'ground'],[32,12,-10,3,3,'small'],[24,14,-8,3,3,'small'],[32,16,-4,4,4,'ground'],[22,18,-4,3,3,'small'],[28,20,0,4,4,'ground'],[18,22,-2,3,3,'small'],[24,24,4,4,4,'ground'],[40,12,-10,12,12,'ground']], coins:[[8,3,-8],[15,4,-15],[8,5,-22],[15,6,-29],[24,7,-33],[34,8,-35],[42,6,-28],[35,11,-19],[32,15,-10]], lasers:[[12,2.5,-11,0,6],[20,3.5,-19,Math.PI/2,6],[38,7,-32,Math.PI/4,6],[26,11,-14,0,6],[36,13,-6,Math.PI/2,6],[12,4.5,-26,0,6]], spinners:[[28,6,-33,2.2,.035],[32,13,-6,2.2,.04],[8,9,-22,2,.045],[28,19,2,2,.05]], spikes:[[18,4,-19,4,'z'],[26,11,-14,3,'z'],[32,17,-2,3,'z'],[22,23,2,3,'z']], saws:[[24,6.5,-38],[38,9,-16],[20,22,-2]], finish:{x:40,y:12,z:-10,r:4}}
+];
+
+function initGame() {
+  try {
+    const data = JSON.parse(localStorage.getItem('dk_save')||'{}');
+    totalCoins = data.coins || 0; 
+    currentSkin = data.skin || 'default';
+    currentHat = data.hat || 'none';
+    unlockedLevels = data.unlockedLevels || 1;
+    wins = data.wins || 0;
+    if(data.gp) GP = data.gp;
+    if(data.ownedSkins){ data.ownedSkins.forEach(id => { const s = SKINS.find(x=>x.id===id); if(s) s.owned = true; }); }
+    if(data.ownedHats){ data.ownedHats.forEach(id => { const s = ACCESSORIES.find(x=>x.id===id); if(s) s.owned = true; }); }
+    if(data.ownedPasses){ data.ownedPasses.forEach(id => { const s = PASSSES.find(x=>x.id===id); if(s) s.owned = true; }); }
+  } catch(e) {}
+  
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87CEEB);
+  scene.fog = new THREE.Fog(0x87CEEB, 90, 200);
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, .1, 500);
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x334466, 1.4));
+  const sun = new THREE.DirectionalLight(0xfff5e0, 2.5);
+  sun.position.set(50, 80, 30);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, {left:-100, right:100, top:100, bottom:-100, near:1, far:300});
+  scene.add(sun);
+
+  levelGroup = new THREE.Group();
+  scene.add(levelGroup);
+  
+  buildCharacter(currentSkin, currentHat);
+  
+  document.addEventListener('pointerlockchange', ()=>{
+    if(document.pointerLockElement !== renderer.domElement && gameState === 'playing' && !isMobile) pauseGame();
+  });
+
+  // УПРАВЛЕНИЕ МЫШЬЮ (ПК)
+  document.addEventListener('mousemove', e=>{
+    if(document.pointerLockElement === renderer.domElement){
+      camYaw -= e.movementX * .0025;
+      camPitch -= e.movementY * .0025; 
+      camPitch = Math.max(-.8, Math.min(.6, camPitch));
+    }
+  });
+
+  // УПРАВЛЕНИЕ СВАЙПОМ (ТЕЛЕФОН)
+  let touchStartX = 0, touchStartY = 0;
+  document.addEventListener('touchstart', e => {
+    if (gameState === 'playing' && e.target.tagName !== 'BUTTON' && !e.target.closest('#joystick-zone') && !e.target.closest('#jump-btn')) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+  }, {passive: false});
+  document.addEventListener('touchmove', e => {
+    if (gameState === 'playing' && e.target.tagName !== 'BUTTON' && !e.target.closest('#joystick-zone') && !e.target.closest('#jump-btn')) {
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      camYaw -= dx * .005;
+      camPitch -= dy * .005;
+      camPitch = Math.max(-.8, Math.min(.6, camPitch));
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+  }, {passive: false});
+
+  // ДЖОЙСТИК
+  const joyZone = document.getElementById('joystick-zone');
+  const joyKnob = document.getElementById('joystick-knob');
+  joyZone.addEventListener('touchstart', e => { joystickActive = true; e.preventDefault(); }, {passive: false});
+  joyZone.addEventListener('touchmove', e => {
+    if(!joystickActive) return;
+    e.preventDefault();
+    const rect = joyZone.getBoundingClientRect();
+    const cx = rect.left + rect.width/2;
+    const cy = rect.top + rect.height/2;
+    const t = e.touches[0];
+    let dx = t.clientX - cx;
+    let dy = t.clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    const maxDist = 40;
+    if(dist > maxDist) { dx = dx/dist*maxDist; dy = dy/dist*maxDist; }
+    joyX = dx / maxDist;
+    joyY = dy / maxDist;
+    joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  }, {passive: false});
+  const endJoy = () => { joystickActive = false; joyX = 0; joyY = 0; joyKnob.style.transform = 'translate(0,0)'; };
+  joyZone.addEventListener('touchend', endJoy);
+  joyZone.addEventListener('touchcancel', endJoy);
+
+  // КНОПКА ПРЫЖКА
+  const jumpBtn = document.getElementById('jump-btn');
+  jumpBtn.addEventListener('touchstart', e => { jumpBtnPressed = true; e.preventDefault(); }, {passive: false});
+  jumpBtn.addEventListener('touchend', e => { jumpBtnPressed = false; e.preventDefault(); }, {passive: false});
+  jumpBtn.addEventListener('touchcancel', e => { jumpBtnPressed = false; });
+
+  if('ontouchstart' in window) { isMobile = true; }
+
+  let keysPressed = '';
+  window.addEventListener('keydown', (e) => {
+    if (e.key.length === 1) {
+      keysPressed += e.key.toUpperCase();
+      if (keysPressed.length > 5) keysPressed = keysPressed.slice(-5);
+      if (keysPressed === 'ADMIN') { document.getElementById('adminPanel').style.display = 'flex'; keysPressed = ''; }
+    }
+  });
+
+  updateMenuCoins();
+  document.getElementById('loader').classList.add('hide');
+  loop();
+}
+
+// АДМИН ФУНКЦИИ
+window.closeAdmin = function() { document.getElementById('adminPanel').style.display = 'none'; }
+window.adminAddCoins = function() { totalCoins += 1000; saveAdminData(); alert('+1000 монет!'); }
+window.adminAddMillion = function() { totalCoins += 1000000; saveAdminData(); alert('+1 000 000 монет!'); }
+window.adminAddTenMillion = function() { totalCoins += 10000000; saveAdminData(); alert('+10 000 000 монет!'); }
+window.adminUnlockLevels = function() { unlockedLevels = 5; saveAdminData(); alert('Все уровни!'); }
+window.adminUnlockSkins = function() { SKINS.forEach(s=>s.owned=true); saveAdminData(); alert('Все скины!'); }
+window.adminUnlockHats = function() { ACCESSORIES.forEach(s=>s.owned=true); saveAdminData(); alert('Все аксессуары!'); }
+window.adminUnlockPasses = function() { PASSSES.forEach(s=>s.owned=true); saveAdminData(); alert('Все пассы!'); }
+window.adminKill = function() { killPlayer(); document.getElementById('adminPanel').style.display = 'none'; }
+window.adminReset = function() { if(confirm('Сбросить прогресс?')) { localStorage.removeItem('dk_save'); location.reload(); } }
+function saveAdminData() {
+  localStorage.setItem('dk_save', JSON.stringify({
+    coins: totalCoins, unlockedLevels: unlockedLevels, skin: currentSkin, hat: currentHat, wins: wins, gp: GP,
+    ownedSkins: SKINS.filter(s=>s.owned).map(s=>s.id),
+    ownedHats: ACCESSORIES.filter(s=>s.owned).map(s=>s.id),
+    ownedPasses: PASSSES.filter(s=>s.owned).map(s=>s.id)
+  }));
+  updateMenuCoins();
+}
+
+window.switchShopTab = function(tab) {
+  shopTab = tab;
+  document.querySelectorAll('.shop-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i===0&&tab==='skins') || (i===1&&tab==='accessories') || (i===2&&tab==='gamepasses'));
+  });
+  renderShop();
+}
+
+const mG = new THREE.MeshStandardMaterial({color:0x5a5e79, roughness:.7, metalness:.1});
+const mI = new THREE.MeshStandardMaterial({color:0x7fd3f7, roughness:.05, metalness:.4, transparent:true, opacity:.9});
+const mB = new THREE.MeshStandardMaterial({color:0xff5d8f, roughness:.4, emissive:0x551122});
+const mM = new THREE.MeshStandardMaterial({color:0xf4a261, roughness:.5, emissive:0x442200});
+const mSmall = new THREE.MeshStandardMaterial({color:0x9da5bd, roughness:.6});
+
+function clearLevel(){
+  while(levelGroup.children.length) levelGroup.remove(levelGroup.children[0]);
+  plats=[]; lasers=[]; spinners=[]; spikes=[]; saws=[]; coins=[];
+}
+
+function buildLevel(idx){
+  clearLevel();
+  currentLevelIdx = idx;
+  const L = LEVELS[idx];
+  
+  if (activePass === 'straightRoad') {
+    L.plats.forEach(([x,y,z,w,d,t])=>{
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w,1,d), mG);
+      m.position.set(x,y,z); m.castShadow = true; m.receiveShadow = true;
+      levelGroup.add(m);
+      plats.push({mesh:m,x,y,z,w,d,h:1,type:t});
+    });
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(60, 1, 4), new THREE.MeshStandardMaterial({color:0x333333}));
+    bridge.position.set(20, 12, -10);
+    bridge.receiveShadow = true;
+    levelGroup.add(bridge);
+    plats.push({mesh:bridge, x:20, y:12, z:-10, w:60, d:4, h:1, type:'ground'});
+  } else {
+    L.plats.forEach(([x,y,z,w,d,t])=>{
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w,1,d), t==='ice'?mI:t==='bounce'?mB:t==='move'?mM:t==='small'?mSmall:mG);
+      m.position.set(x,y,z); m.castShadow = true; m.receiveShadow = true;
+      levelGroup.add(m);
+      const p = {mesh:m,x,y,z,w,d,h:1,type:t};
+      if(t==='move'){p.startX=x; p.endX=x+8; p.speed=.025; p.dir=1}
+      plats.push(p);
+    });
+  }
+
+  const cg = new THREE.CylinderGeometry(.6,.6,.2,24);
+  const cm = new THREE.MeshStandardMaterial({color:0xffd60a, metalness:.95, roughness:.15, emissive:0xaa8800});
+  L.coins.forEach(([x,y,z])=>{
+    const c = new THREE.Mesh(cg, cm); c.position.set(x,y,z); c.rotation.x = Math.PI/2;
+    c.castShadow = true; levelGroup.add(c);
+    coins.push({mesh:c, baseY:y, taken:false});
+  });
+
+  if (activePass !== 'noLasers') {
+    const laserMat = new THREE.MeshBasicMaterial({color:0xff0044});
+    L.lasers.forEach(([x,y,z,rot,length])=>{
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,length,8), laserMat);
+      beam.rotation.z = Math.PI/2;
+      beam.position.set(x,y,z); beam.rotation.y = rot;
+      levelGroup.add(beam);
+      lasers.push({mesh:beam,x,y,z,rot,length});
+    });
+  }
+
+  L.spinners.forEach(([x,y,z,radius,speed])=>{
+    const g = new THREE.Group();
+    const barMat = new THREE.MeshStandardMaterial({color:0xff2222, emissive:0x660000});
+    for(let i=0;i<2;i++){
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(radius*2,.3,.3), barMat);
+      bar.rotation.y = i*Math.PI/2; g.add(bar);
+    }
+    g.position.set(x,y,z); levelGroup.add(g);
+    spinners.push({mesh:g,x,y,z,radius,speed,angle:0});
+  });
+
+  const spikeMat = new THREE.MeshStandardMaterial({color:0x666666, metalness:.9});
+  L.spikes.forEach(([x,y,z,count,dir])=>{
+    for(let i=0;i<count;i++){
+      const s = new THREE.Mesh(new THREE.ConeGeometry(.22,.7,8), spikeMat);
+      if(dir==='z') s.position.set(x-.9+i*.6, y+.35, z);
+      else s.position.set(x, y+.35, z-.9+i*.6);
+      levelGroup.add(s);
+      spikes.push({mesh:s,x:s.position.x,y:s.position.y,z:s.position.z});
+    }
+  });
+
+  const sawMat = new THREE.MeshStandardMaterial({color:0xcccccc, metalness:.95});
+  L.saws.forEach(([x,y,z,radius=.8])=>{
+    const g = new THREE.Group();
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,.15,16), sawMat);
+    disc.rotation.x = Math.PI/2; g.add(disc);
+    g.position.set(x,y,z); levelGroup.add(g);
+    saws.push({mesh:g,x,y,z,radius,baseX:x});
+  });
+
+  finishObj = L.finish;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,4,12), new THREE.MeshStandardMaterial({color:0xcccccc}));
+  pole.position.set(finishObj.x, finishObj.y+2, finishObj.z); levelGroup.add(pole);
+  flagMesh = new THREE.Mesh(new THREE.PlaneGeometry(2,1.2), new THREE.MeshStandardMaterial({color:0xe63946, side:THREE.DoubleSide}));
+  flagMesh.position.set(finishObj.x+1, finishObj.y+3.5, finishObj.z); levelGroup.add(flagMesh);
+  
+  document.getElementById('tc').textContent = coins.length;
+  document.getElementById('cc').textContent = '0';
+}
+
+function buildCharacter(skinId, hatId){
+  if(pg) scene.remove(pg);
+  pg = new THREE.Group();
+  const skin = SKINS.find(s=>s.id===skinId) || SKINS[0];
+  const shirtMat = new THREE.MeshStandardMaterial({color:skin.color, roughness:.5});
+  const skinMat = new THREE.MeshStandardMaterial({color:0xffcf9f});
+  const pantsMat = new THREE.MeshStandardMaterial({color:0x264653});
+  
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(1.2,1.4,.6), shirtMat);
+  torso.position.y = 1.6; torso.castShadow = true; pg.add(torso);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(.7,.7,.7), skinMat);
+  head.position.y = 2.65; head.castShadow = true; pg.add(head);
+  const em = new THREE.MeshStandardMaterial({color:0});
+  const eL = new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.1), em); eL.position.set(-.15,2.7,.36); pg.add(eL);
+  const eR = new THREE.Mesh(new THREE.BoxGeometry(.1,.1,.1), em); eR.position.set(.15,2.7,.36); pg.add(eR);
+  const mouth = new THREE.Mesh(new THREE.BoxGeometry(.3,.05,.1), em); mouth.position.set(0,2.5,.36); pg.add(mouth);
+
+  const armGeo = new THREE.BoxGeometry(.4,1.2,.4); armGeo.translate(0,-.6,0);
+  const armL = new THREE.Mesh(armGeo, shirtMat); armL.position.set(-.8,2.3,0); armL.castShadow = true; pg.add(armL);
+  const armR = new THREE.Mesh(armGeo, shirtMat); armR.position.set(.8,2.3,0); armR.castShadow = true; pg.add(armR);
+  const legGeo = new THREE.BoxGeometry(.45,1,.45); legGeo.translate(0,-.5,0);
+  const legL = new THREE.Mesh(legGeo, pantsMat); legL.position.set(-.32,.9,0); legL.castShadow = true; pg.add(legL);
+  const legR = new THREE.Mesh(legGeo, pantsMat); legR.position.set(.32,.9,0); legR.castShadow = true; pg.add(legR);
+
+  if (hatId !== 'none') {
+    if (hatId === 'cap') {
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(.8, .2, .8), new THREE.MeshStandardMaterial({color:0xff0000}));
+      cap.position.set(0, 3.05, 0); cap.castShadow = true; pg.add(cap);
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(.8, .05, .4), new THREE.MeshStandardMaterial({color:0xff0000}));
+      brim.position.set(0, 2.95, .5); pg.add(brim);
+    } else if (hatId === 'crown') {
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(.4, .4, .3, 5), new THREE.MeshStandardMaterial({color:0xffd700, metalness:1}));
+      crown.position.set(0, 3.1, 0); crown.castShadow = true; pg.add(crown);
+    } else if (hatId === 'tophat') {
+      const hat = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .8, 16), new THREE.MeshStandardMaterial({color:0x111111}));
+      hat.position.set(0, 3.3, 0); hat.castShadow = true; pg.add(hat);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(.5, .5, .05, 16), new THREE.MeshStandardMaterial({color:0x111111}));
+      brim.position.set(0, 2.95, 0); pg.add(brim);
+    } else if (hatId === 'halo') {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(.35, .05, 8, 20), new THREE.MeshStandardMaterial({color:0xffff00, emissive:0xffaa00}));
+      halo.position.set(0, 3.2, 0); halo.rotation.x = Math.PI/2; pg.add(halo);
+    } else if (hatId === 'horns') {
+      const hornMat = new THREE.MeshStandardMaterial({color:0xff0000});
+      const h1 = new THREE.Mesh(new THREE.ConeGeometry(.1, .4, 8), hornMat); h1.position.set(-.3, 3.1, 0); h1.rotation.z = .3; pg.add(h1);
+      const h2 = new THREE.Mesh(new THREE.ConeGeometry(.1, .4, 8), hornMat); h2.position.set(.3, 3.1, 0); h2.rotation.z = -.3; pg.add(h2);
+    }
+  }
+
+  if (activePass === 'wings') {
+    const wingMat = new THREE.MeshStandardMaterial({color:0xffffff, emissive:0x88aaff, transparent:true, opacity:0.8});
+    const wl = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.8), wingMat); wl.position.set(-1.2, 2, -0.2); wl.rotation.z = 0.5; pg.add(wl);
+    const wr = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.8), wingMat); wr.position.set(1.2, 2, -0.2); wr.rotation.z = -0.5; pg.add(wr);
+  }
+  
+  pg.position.copy(P.pos);
+  scene.add(pg);
+  charParts = {armL, armR, legL, legR};
+  walkPhase = 0;
+}
+
+function reset(){
+  if(plats.length) P.pos.set(plats[0].x, plats[0].y+3, plats[0].z);
+  P.vel.set(0,0,0); P.jumps = 2;
+  coins.forEach(c=>{c.taken = false; c.mesh.visible = true});
+  coinsGot = 0; startTime = performance.now();
+  document.getElementById('cc').textContent = '0';
+  plats.forEach(p=>{if(p.type==='move'){p.x = p.startX; p.mesh.position.x = p.startX; p.dir = 1}});
+  camYaw = 0; camPitch = -.15; walkPhase = 0; idleTime = 0;
+  if(charParts.armL){charParts.armL.rotation.set(0,0,0);charParts.armR.rotation.set(0,0,0);charParts.legL.rotation.set(0,0,0);charParts.legR.rotation.set(0,0,0);}
+}
+
+function killPlayer(){
+  if(P.pos.y < -100) {
+    if(plats.length) P.pos.set(plats[0].x, plats[0].y+3, plats[0].z); else P.pos.set(0,3,0);
+    P.vel.set(0,0,0); P.jumps = 2;
+  } else if (activePass === 'godMode') {
+    return;
+  } else {
+    if(plats.length) P.pos.set(plats[0].x, plats[0].y+3, plats[0].z); else P.pos.set(0,3,0);
+    P.vel.set(0,0,0); P.jumps = 2;
+  }
+}
+
+function animateChar(speed){
+  if(!charParts.legL) return;
+  if(P.onGround){
+    if(speed > .05){
+      walkPhase += speed * 25;
+      const s = Math.sin(walkPhase);
+      const s2 = Math.sin(walkPhase + Math.PI);
+      charParts.legL.rotation.x = s * .8;
+      charParts.legR.rotation.x = s2 * .8;
+      charParts.armL.rotation.x = s2 * .8;
+      charParts.armR.rotation.x = s * .8;
+      charParts.armL.rotation.z = 0; charParts.armR.rotation.z = 0;
+    } else {
+      idleTime += 0.03;
+      const breath = Math.sin(idleTime) * .05;
+      charParts.legL.rotation.x *= .7; charParts.legR.rotation.x *= .7;
+      charParts.armL.rotation.x += (-breath - charParts.armL.rotation.x) * .1;
+      charParts.armR.rotation.x += (-breath - charParts.armR.rotation.x) * .1;
+      charParts.armL.rotation.z *= .8; charParts.armR.rotation.z *= .8;
+    }
+  } else {
+    charParts.legL.rotation.x += (-.5 - charParts.legL.rotation.x) * .2;
+    charParts.legR.rotation.x += (.5 - charParts.legR.rotation.x) * .2;
+    charParts.armL.rotation.x += (-1.5 - charParts.armL.rotation.x) * .2;
+    charParts.armR.rotation.x += (-1.5 - charParts.armR.rotation.x) * .2;
+    charParts.armL.rotation.z += (-.2 - charParts.armL.rotation.z) * .2;
+    charParts.armR.rotation.z += (.2 - charParts.armR.rotation.z) * .2;
+  }
+}
+
+function update(dt){
+  if(gameState !== 'playing') return;
+  
+  plats.forEach(p=>{if(p.type==='move'){p.x += p.speed*p.dir*(dt*60); if(p.x>p.endX){p.x=p.endX;p.dir=-1} if(p.x<p.startX){p.x=p.startX;p.dir=1} p.mesh.position.x = p.x}});
+  spinners.forEach(s=>{s.angle += s.speed*(dt*60); s.mesh.rotation.y = s.angle});
+  saws.forEach(s=>{s.mesh.rotation.z += .15; const dx = Math.sin(performance.now()*.001)*1.5; s.mesh.position.x = s.baseX + dx});
+  
+  let ix = 0, iz = 0;
+  if(keys['KeyA']||keys['ArrowLeft'] || joyX < -0.2) ix -= 1;
+  if(keys['KeyD']||keys['ArrowRight'] || joyX > 0.2) ix += 1;
+  if(keys['KeyW']||keys['ArrowUp'] || joyY < -0.2) iz -= 1;
+  if(keys['KeyS']||keys['ArrowDown'] || joyY > 0.2) iz += 1;
+  const sin = Math.sin(camYaw), cos = Math.cos(camYaw);
+  const mx = ix*cos + iz*sin, mz = iz*cos - ix*sin;
+  const len = Math.hypot(mx,mz) || 1;
+  const acc = P.onGround ? 0.018 : 0.008;
+  if(ix||iz){P.vel.x += mx/len*acc; P.vel.z += mz/len*acc}
+  
+  const onIce = P.onGround && groundType === 'ice';
+  const fr = P.onGround ? (onIce?.965:0.88) : 0.98;
+  P.vel.x *= Math.pow(fr, dt*60);
+  P.vel.z *= Math.pow(fr, dt*60);
+  const hs = Math.hypot(P.vel.x, P.vel.z);
+  if(hs > 0.17){const k = 0.17/hs; P.vel.x *= k; P.vel.z *= k}
+  
+  const now = performance.now()/1000;
+  const jumpPressed = keys['Space'] || jumpBtnPressed || (joyY < -0.8);
+  if(jumpPressed && !jumpPrev) jumpPressedAt = now;
+  jumpPrev = jumpPressed;
+
+  if(P.onGround) lastGroundedAt = now;
+  const canJump = (now - lastGroundedAt < 0.12) || P.onGround;
+  const hasBufferedJump = (now - jumpPressedAt < 0.12);
+
+  if (activePass === 'wings' && jumpPressed && P.vel.y > -0.3) {
+     P.vel.y += 0.012*60*dt;
+     if (P.vel.y > 0.15) P.vel.y = 0.15;
+  } else {
+    if(hasBufferedJump && P.jumps > 0 && (canJump || P.jumps > 1)){
+      P.vel.y = 0.45;
+      P.jumps--;
+      jumpPressedAt = -999;
+      P.onGround = false;
+      if(hs > .01){P.vel.x *= 1.25; P.vel.z *= 1.25}
+    }
+  }
+
+  if(P.vel.y > 0 && activePass !== 'wings') P.vel.y -= 0.028*1.2*dt*60;
+  else P.vel.y -= 0.028*dt*60;
+  if(P.vel.y < -.6) P.vel.y = -.6;
+  
+  P.pos.x += P.vel.x*dt*60; P.pos.y += P.vel.y*dt*60; P.pos.z += P.vel.z*dt*60;
+  
+  P.onGround = false; groundType = null;
+
+  if (activePass === 'walkVoid') {
+     if (P.pos.y < 11 && P.pos.y > 10) {
+        P.onGround = true; P.jumps = 2; P.pos.y = 11; P.vel.y = 0;
+     }
+  }
+
+  const pr = P.r, ph = P.h;
+  for(const p of plats){
+    const px1 = P.pos.x-pr, px2 = P.pos.x+pr, pz1 = P.pos.z-pr, pz2 = P.pos.z+pr;
+    const py1 = P.pos.y-ph/2, py2 = P.pos.y+ph/2;
+    const bx1 = p.x-p.w/2, bx2 = p.x+p.w/2, bz1 = p.z-p.d/2, bz2 = p.z+p.d/2, by1 = p.y, by2 = p.y+p.h;
+    if(px2>bx1 && px1<bx2 && pz2>bz1 && pz1<bz2 && py2>by1 && py1<by2){
+      if(P.vel.y <= 0 && py1 < by2-.05){
+        P.pos.y = by2+ph/2;
+        if(p.type === 'bounce'){P.vel.y = 0.45*1.7; P.jumps = 2}
+        else{P.vel.y = 0; P.onGround = true; P.jumps = 2; groundType = p.type}
+      }
+    }
+  }
+  
+  for(const l of lasers){
+    if (activePass === 'noLasers') continue;
+    const cosR = Math.cos(l.rot), sinR = Math.sin(l.rot);
+    const localX = (P.pos.x-l.x)*cosR + (P.pos.z-l.z)*sinR;
+    const localZ = -(P.pos.x-l.x)*sinR + (P.pos.z-l.z)*cosR;
+    if(Math.abs(localX) < l.length/2 && Math.abs(localZ) < .4 && Math.abs(P.pos.y-l.y) < 1.2){killPlayer(); break}
+  }
+  for(const s of spikes){
+    const dx = P.pos.x-s.x, dy = P.pos.y-s.y, dz = P.pos.z-s.z;
+    if(dx*dx+dz*dz < .3 && Math.abs(dy) < .6){killPlayer(); break}
+  }
+  for(const s of spinners){
+    for(let i=0;i<2;i++){
+      const a = s.angle+i*Math.PI/2;
+      const bx = Math.cos(a), bz = Math.sin(a);
+      const dx = P.pos.x-s.x, dz = P.pos.z-s.z;
+      const proj = dx*bx + dz*bz;
+      if(Math.abs(proj) < s.radius && Math.abs(P.pos.y-s.y) < .8){
+        const perpX = dx-bx*proj, perpZ = dz-bz*proj;
+        if(perpX*perpX+perpZ*perpZ < .4){killPlayer(); break}
+      }
+    }
+  }
+  for(const s of saws){
+    const dx = P.pos.x-s.mesh.position.x, dy = P.pos.y-s.y, dz = P.pos.z-s.mesh.position.z;
+    if(dx*dx+dz*dz < (s.radius+.4)*(s.radius+.4) && Math.abs(dy) < 1.2){killPlayer(); break}
+  }
+  if(P.pos.y < -20) killPlayer();
+  
+  coins.forEach(c=>{if(!c.taken){const dx = P.pos.x-c.mesh.position.x, dy = P.pos.y-c.mesh.position.y, dz = P.pos.z-c.mesh.position.z; if(dx*dx+dy*dy+dz*dz < 2.5){c.taken = true; c.mesh.visible = false; coinsGot++; document.getElementById('cc').textContent = coinsGot}}});
+  
+  const dx = P.pos.x-finishObj.x, dz = P.pos.z-finishObj.z;
+  if(Math.sqrt(dx*dx+dz*dz) < finishObj.r && Math.abs(P.pos.y-finishObj.y) < 3){winGame()}
+  
+  if(hs > .02){
+    const ta = Math.atan2(P.vel.x, P.vel.z);
+    pg.rotation.y += Math.atan2(Math.sin(ta-pg.rotation.y), Math.cos(ta-pg.rotation.y))*.2;
+  }
+  pg.position.copy(P.pos);
+  animateChar(hs);
+  
+  camTarget.set(P.pos.x, P.pos.y+2, P.pos.z);
+  const offset = new THREE.Vector3(
+    Math.sin(camYaw)*Math.cos(camPitch)*camDist,
+    Math.sin(camPitch)*camDist+3,
+    Math.cos(camYaw)*Math.cos(camPitch)*camDist
+  );
+  camera.position.lerp(camTarget.clone().add(offset), .15);
+  camera.lookAt(camTarget);
+  
+  coins.forEach(c=>{if(!c.taken){c.mesh.rotation.z += .03; c.mesh.position.y = c.baseY + Math.sin(performance.now()*.003+c.baseY)*.15}});
+  if(flagMesh) flagMesh.rotation.y = Math.sin(performance.now()*.002)*.15;
+  document.getElementById('time').textContent = ((performance.now()-startTime)/1000).toFixed(1);
+}
+
+let lastTime = performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  const now = performance.now();
+  const dt = Math.min((now-lastTime)/1000, .05);
+  lastTime = now;
+  update(dt);
+  if(renderer) renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', ()=>{if(camera){camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight)}});
+
+// --- UI ---
+window.showScreen = function(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  if(id) document.getElementById(id).classList.add('active');
+  if(id === 'shop') renderShop();
+  if(id === 'levels') renderLevels();
+  if(id === 'leaderboard') renderLeaderboard();
+  if(id === 'mainMenu') updateMenuCoins();
+};
+window.startLevel = function(idx){
+  if(idx >= unlockedLevels) return;
+  showScreen(null);
+  document.getElementById('hud').style.display = 'flex';
+  if(!isMobile) document.getElementById('hint').style.display = 'block';
+  buildLevel(idx);
+  gameState = 'playing';
+  reset();
+  document.body.classList.add('playing');
+  if(!isMobile && renderer) renderer.domElement.requestPointerLock();
+};
+window.resumeGame = function(){
+  showScreen(null);
+  gameState = 'playing';
+  document.body.classList.add('playing');
+  if(!isMobile && renderer) renderer.domElement.requestPointerLock();
+};
+window.pauseGame = function(){
+  if(gameState !== 'playing') return;
+  gameState = 'paused';
+  showScreen('pause');
+  document.body.classList.remove('playing');
+  if(document.pointerLockElement) document.exitPointerLock();
+};
+window.restartGame = function(){
+  showScreen(null);
+  gameState = 'playing';
+  document.body.classList.add('playing');
+  reset();
+  if(!isMobile && renderer) renderer.domElement.requestPointerLock();
+};
+window.exitToMenu = function(){
+  gameState = 'menu';
+  showScreen('mainMenu');
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('hint').style.display = 'none';
+  document.body.classList.remove('playing');
+  if(document.pointerLockElement) document.exitPointerLock();
+  updateMenuCoins();
+};
+window.nextLevel = function(){
+  const next = currentLevelIdx + 1;
+  if(next < LEVELS.length && next < unlockedLevels) startLevel(next);
+  else showScreen('levels');
+};
+function winGame(){
+  gameState = 'victory';
+  document.body.classList.remove('playing');
+  if(document.pointerLockElement) document.exitPointerLock();
+  const t = ((performance.now()-startTime)/1000).toFixed(1);
+  const reward = coinsGot * 10 + 50 + currentLevelIdx * 20;
+  totalCoins += reward;
+  wins++;
+  if(currentLevelIdx + 1 >= unlockedLevels && currentLevelIdx + 1 < LEVELS.length){
+    unlockedLevels = currentLevelIdx + 2;
+  }
+  saveAdminData();
+  document.getElementById('wt').textContent = `Монеты: ${coinsGot}/${coins.length}`;
+  document.getElementById('tt').textContent = `Время: ${t} сек`;
+  document.getElementById('reward').textContent = `+${reward} монет (всего: ${totalCoins})`;
+  showScreen('victory');
+  updateMenuCoins();
+}
+window.updateMenuCoins = function(){
+  document.getElementById('menuCoins').textContent = totalCoins;
+  document.getElementById('shopCoins').textContent = totalCoins;
+};
+
+window.selectPass = function(passId) {
+  if (activePass === passId) activePass = null;
+  else activePass = passId;
+  renderPassSelector();
+}
+
+function renderPassSelector(){
+  const container = document.getElementById('passSelector');
+  container.innerHTML = '';
+  
+  const noneBtn = document.createElement('div');
+  noneBtn.className = 'pass-item' + (activePass === null ? ' active' : '');
+  noneBtn.textContent = '🚫 Без пасса';
+  noneBtn.onclick = () => { activePass = null; renderPassSelector(); };
+  container.appendChild(noneBtn);
+
+  PASSSES.forEach(pass => {
+    if(!pass.owned) return;
+    const btn = document.createElement('div');
+    btn.className = 'pass-item' + (activePass === pass.id ? ' active' : '');
+    btn.textContent = `🎫 ${pass.name}`;
+    btn.onclick = () => {
+      if (pass.id === 'skip') {
+        winGame();
+      } else {
+        selectPass(pass.id);
+      }
+    };
+    container.appendChild(btn);
+  });
+}
+
+function renderLevels(){
+  const grid = document.getElementById('levelsGrid');
+  grid.innerHTML = '';
+  LEVELS.forEach((L, i)=>{
+    const locked = i >= unlockedLevels;
+    const card = document.createElement('div');
+    card.className = 'level-card' + (locked?' locked':'');
+    card.innerHTML = `
+      <div class="level-num">УРОВЕНЬ ${i+1}</div>
+      <div class="level-name">${L.name}</div>
+      <div class="level-diff diff-${L.diff}">${L.diffName}</div>
+      ${locked ? '<div class="level-best">🔒 Закрыто</div>' : ''}
+    `;
+    card.onclick = ()=>{if(!locked) startLevel(i)};
+    grid.appendChild(card);
+  });
+  renderPassSelector();
+}
+
+function renderLeaderboard(){
+  const tbody = document.getElementById('leaderboardBody');
+  let fakePlayers = [
+    {name:'Серёга228', coins: 1500, levels: 5},
+    {name:'Про_геймер', coins: 980, levels: 4},
+    {name:'Иван_Лох', coins: 450, levels: 3},
+    {name:'Обиженный', coins: 200, levels: 2},
+    {name:'Нуб', coins: 50, levels: 1}
+  ];
+  fakePlayers.push({name:'ТЫ', coins: totalCoins, levels: unlockedLevels - 1, isYou: true});
+  fakePlayers.sort((a, b) => b.coins - a.coins);
+  
+  tbody.innerHTML = '';
+  fakePlayers.forEach((p, i) => {
+    const tr = document.createElement('tr');
+    let rankClass = '';
+    if(i === 0) rankClass = 'rank-1';
+    else if(i === 1) rankClass = 'rank-2';
+    else if(i === 2) rankClass = 'rank-3';
+    if(p.isYou) tr.style.background = 'rgba(255, 214, 10, 0.2)';
+    tr.innerHTML = `<td class="${rankClass}">${i + 1}</td><td style="font-weight: ${p.isYou ? 800 : 400}">${p.name}</td><td style="color:#ffd60a">${p.coins} 🪙</td><td>${p.levels}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderShop(){
+  updateMenuCoins();
+  const content = document.getElementById('shopContent');
+  content.innerHTML = '';
+  
+  if (shopTab === 'skins') {
+    SKINS.forEach(skin => {
+      const card = document.createElement('div');
+      card.className = 'skin-card' + (skin.owned?' owned':'') + (currentSkin === skin.id?' equipped':'');
+      card.innerHTML = `
+        <div class="skin-preview" style="background:radial-gradient(circle at 30% 30%,#${skin.color.toString(16).padStart(6,'0')}66,#${skin.color.toString(16).padStart(6,'0')}22)">${skin.emoji}</div>
+        <div class="skin-name">${skin.name}</div>
+        ${skin.owned ? (currentSkin === skin.id ? '<div style="color:#2ec4b6;font-size:11px;font-weight:700">✓ Надет</div>' : '<div style="color:#aaa;font-size:11px">Клик — надеть</div>') : `<div class="skin-price">🪙 ${skin.price}</div>`}
+      `;
+      card.onclick = ()=>{
+        if(skin.owned){ currentSkin = skin.id; saveAdminData(); buildCharacter(currentSkin, currentHat); renderShop(); }
+        else if(totalCoins >= skin.price){ totalCoins -= skin.price; skin.owned = true; currentSkin = skin.id; saveAdminData(); buildCharacter(currentSkin, currentHat); renderShop(); updateMenuCoins(); }
+        else { alert(`Не хватает ${skin.price - totalCoins} монет!`); }
+      };
+      content.appendChild(card);
+    });
+  } else if (shopTab === 'accessories') {
+    ACCESSORIES.forEach(hat => {
+      const card = document.createElement('div');
+      card.className = 'skin-card' + (hat.owned?' owned':'') + (currentHat === hat.id?' equipped':'');
+      card.innerHTML = `
+        <div class="skin-preview" style="background:rgba(255,255,255,0.1)">${hat.emoji}</div>
+        <div class="skin-name">${hat.name}</div>
+        ${hat.owned ? (currentHat === hat.id ? '<div style="color:#2ec4b6;font-size:11px;font-weight:700">✓ Надет</div>' : '<div style="color:#aaa;font-size:11px">Клик — надеть</div>') : `<div class="skin-price">🪙 ${hat.price}</div>`}
+      `;
+      card.onclick = ()=>{
+        if(hat.owned){ currentHat = hat.id; saveAdminData(); buildCharacter(currentSkin, currentHat); renderShop(); }
+        else if(totalCoins >= hat.price){ totalCoins -= hat.price; hat.owned = true; currentHat = hat.id; saveAdminData(); buildCharacter(currentSkin, currentHat); renderShop(); updateMenuCoins(); }
+        else { alert(`Не хватает ${hat.price - totalCoins} монет!`); }
+      };
+      content.appendChild(card);
+    });
+  } else if (shopTab === 'gamepasses') {
+    PASSSES.forEach(pass => {
+      const card = document.createElement('div');
+      card.className = 'skin-card' + (pass.owned?' owned':'');
+      card.style.width = '180px';
+      card.innerHTML = `
+        <div class="skin-preview" style="background:linear-gradient(135deg,#ff0044,#ff5d8f); font-size:30px">👑</div>
+        <div class="skin-name" style="font-size:14px; margin-top:6px">${pass.name}</div>
+        <div style="font-size:10px; opacity:0.7; margin-bottom:6px">${pass.desc}</div>
+        ${pass.owned ? '<div style="color:#2ec4b6;font-weight:700;font-size:12px">✓ Куплено</div>' : `<div class="skin-price">🪙 ${pass.price}</div>`}
+      `;
+      card.onclick = ()=>{
+        if(!pass.owned) {
+          if(totalCoins >= pass.price) {
+            totalCoins -= pass.price; pass.owned = true; 
+            saveAdminData(); renderShop(); updateMenuCoins();
+            buildCharacter(currentSkin, currentHat);
+            alert(`"${pass.name}" куплен!`);
+          } else { alert(`Не хватает ${pass.price - totalCoins} монет!`); }
+        }
+      };
+      content.appendChild(card);
+    });
+  }
+}
+</script>
+</body>
+</html>
